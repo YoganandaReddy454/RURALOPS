@@ -2,17 +2,28 @@ from fastapi import FastAPI, File, UploadFile
 import numpy as np
 from PIL import Image
 import io
+import os
 
 app = FastAPI()
 
 model = None
 IMG_SIZE = 224
 
+@app.on_event("startup")
+async def startup_event():
+    load_model()
+
 def load_model():
     global model
     if model is None:
-        import tensorflow as tf   # moved inside function
-        model = tf.keras.models.load_model("RURALOPS.keras")
+        try:
+            import tensorflow as tf
+            model_path = os.path.join(os.getcwd(), "RURALOPS.keras")
+            model = tf.keras.models.load_model(model_path)
+            print("Model loaded successfully")
+        except Exception as e:
+            print(f"Error loading model: {e}")
+            raise e
 
 def preprocess(image):
     image = image.resize((IMG_SIZE, IMG_SIZE))
@@ -27,7 +38,8 @@ def home():
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     try:
-        load_model()
+        if model is None:
+            return {"error": "Model not loaded"}
 
         image = Image.open(io.BytesIO(await file.read())).convert("RGB")
         img = preprocess(image)
