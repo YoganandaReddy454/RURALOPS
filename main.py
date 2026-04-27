@@ -1,17 +1,12 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile
 import numpy as np
 from PIL import Image
 import io
 import os
 
-app = FastAPI()
-
-model = None
 IMG_SIZE = 224
-
-@app.on_event("startup")
-async def startup_event():
-    load_model()
+model = None
 
 def load_model():
     global model
@@ -25,6 +20,13 @@ def load_model():
             print(f"Error loading model: {e}")
             raise e
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    load_model()
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
 def preprocess(image):
     image = image.resize((IMG_SIZE, IMG_SIZE))
     image = np.array(image, dtype=np.float32) / 255.0
@@ -33,7 +35,7 @@ def preprocess(image):
 
 @app.get("/")
 def home():
-    return {"message": "API running"}
+    return {"message": "RURALOPS API is running"}
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
